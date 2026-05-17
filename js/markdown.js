@@ -430,6 +430,9 @@
     target.innerHTML = sanitized;
 
     renderMath(target);
+    if (window.MdvAttachments && window.MdvAttachments.rewriteImageSrcs) {
+      window.MdvAttachments.rewriteImageSrcs(target);
+    }
     return renderMermaidBlocks(target);
   }
 

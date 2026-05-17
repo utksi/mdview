@@ -14,6 +14,8 @@
     theme: 'auto',     // 'auto' | 'light' | 'dark'
     splitRatio: 0.5,
     syncEnabled: true,
+    clickNavigate: false,
+    lineNumbers: true,
     dirty: false
   };
 
@@ -29,17 +31,29 @@
     statsEditor: $('#stats-editor'),
     statsPreview: $('#stats-preview'),
     btnOpen: $('#btn-open'),
+    btnAttach: $('#btn-attach'),
     btnSave: $('#btn-save'),
     btnExportHtml: $('#btn-export-html'),
     btnPrint: $('#btn-print'),
+    btnLineNums: $('#btn-linenums'),
     btnSync: $('#btn-sync'),
+    btnClickNav: $('#btn-clicknav'),
     btnTheme: $('#btn-theme'),
     btnHelp: $('#btn-help'),
     helpDialog: $('#help-dialog'),
     dropOverlay: $('#drop-overlay'),
     toast: $('#toast'),
-    mobileTabs: $('#mobile-tabs')
+    mobileTabs: $('#mobile-tabs'),
+    attachPopover: $('#attach-popover'),
+    attachClose:   $('#attach-close'),
+    attachList:    $('#attach-list'),
+    attachEmpty:   $('#attach-empty'),
+    attachAdd:     $('#attach-add'),
+    attachInsert:  $('#attach-insert'),
+    attachInput:   $('#attach-input'),
+    attachCount:   $('#attach-count')
   };
+  let selectedAttachment = null;
 
   /* Theme handling */
   function applyTheme() {
@@ -283,7 +297,18 @@
   function saveFile() {
     const name = window.MdvFiles.defaultFilename(state.filename, 'md');
     window.MdvFiles.downloadText(name, cm.getValue());
-    toast('Saved ' + name);
+    const attachCount = window.MdvAttachments ? window.MdvAttachments.count() : 0;
+    if (attachCount > 0) {
+      // Download every image after a short delay so the browser separates them
+      setTimeout(function () {
+        window.MdvAttachments.downloadAll();
+      }, 250);
+      toast('Saved ' + name + ' + ' + attachCount +
+        ' attachment' + (attachCount === 1 ? '' : 's') +
+        ' — keep them in the same folder');
+    } else {
+      toast('Saved ' + name);
+    }
   }
   function exportHtml() {
     const name = window.MdvFiles.defaultFilename(state.filename, 'html');
@@ -323,20 +348,45 @@
       e.preventDefault();
       depth = 0;
       hide();
-      const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-      if (file) openFileObject(file);
+      const files = (e.dataTransfer && e.dataTransfer.files) ? Array.from(e.dataTransfer.files) : [];
+      if (!files.length) return;
+      const images = files.filter(function (f) { return /^image\//.test(f.type); });
+      const others = files.filter(function (f) { return !/^image\//.test(f.type); });
+      if (images.length) {
+        addAttachmentsFromFiles(images);
+      }
+      if (others.length) {
+        openFileObject(others[0]);
+      }
     });
   }
 
   /* Paste markdown text directly */
   function installPaste() {
     document.addEventListener('paste', function (e) {
-      // Don't hijack pastes while typing into the editor or any field
+      const cd = e.clipboardData;
+      if (!cd) return;
+      // Look for an image first — works from screenshot tools / file copy.
+      const imgItem = Array.prototype.find && Array.prototype.find.call(
+        cd.items || [],
+        function (it) { return it.kind === 'file' && /^image\//.test(it.type); }
+      );
+      if (imgItem) {
+        const f = imgItem.getAsFile();
+        if (f) {
+          e.preventDefault();
+          const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+          const ext = (f.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
+          addAttachmentsFromFiles([f], 'pasted-' + stamp + '.' + ext);
+          return;
+        }
+      }
+      // Otherwise fall back to pasting markdown text, but only when the
+      // user is not typing into a field.
       const t = e.target;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
-      // ignore pastes inside the CodeMirror editor area too
       if (t && t.closest && t.closest('.CodeMirror')) return;
-      const text = e.clipboardData && e.clipboardData.getData('text/plain');
+      const text = cd.getData('text/plain');
       if (text && /[#*`>\-_\[]/.test(text) && text.length > 8) {
         e.preventDefault();
         if (cm.getValue().trim() && !confirm('Replace current content with pasted markdown?')) return;
@@ -372,14 +422,39 @@
     toast('Sync scroll ' + (state.syncEnabled ? 'on' : 'off'));
   }
 
+  /* Click-to-navigate toggle (double-click in either pane jumps the
+     other pane to the matching line — useful when sync scroll is off). */
+  function toggleClickNavigate() {
+    state.clickNavigate = !state.clickNavigate;
+    sync.setClickNavigate(state.clickNavigate);
+    els.btnClickNav.setAttribute('aria-pressed', state.clickNavigate ? 'true' : 'false');
+    window.MdvStorage.set('clickNavigate', state.clickNavigate);
+    toast('Double-click to jump ' + (state.clickNavigate ? 'on' : 'off'));
+  }
+
+  /* Line-numbers toggle */
+  function toggleLineNumbers() {
+    state.lineNumbers = !state.lineNumbers;
+    if (cm) {
+      cm.setOption('lineNumbers', state.lineNumbers);
+      requestAnimationFrame(function () { cm.refresh(); });
+    }
+    els.btnLineNums.setAttribute('aria-pressed', state.lineNumbers ? 'true' : 'false');
+    window.MdvStorage.set('lineNumbers', state.lineNumbers);
+    toast('Line numbers ' + (state.lineNumbers ? 'on' : 'off'));
+  }
+
   /* Restore persisted state */
   function restoreState() {
-    const stored = window.MdvStorage.get('theme', 'auto');
-    state.theme = stored;
+    state.theme = window.MdvStorage.get('theme', 'auto');
     state.mode = window.MdvStorage.get('mode', initialMode());
     state.splitRatio = +window.MdvStorage.get('splitRatio', 0.5) || 0.5;
     state.syncEnabled = window.MdvStorage.get('syncEnabled', true);
+    state.clickNavigate = window.MdvStorage.get('clickNavigate', false);
+    state.lineNumbers   = window.MdvStorage.get('lineNumbers', true);
     els.btnSync.setAttribute('aria-pressed', state.syncEnabled ? 'true' : 'false');
+    els.btnClickNav.setAttribute('aria-pressed', state.clickNavigate ? 'true' : 'false');
+    els.btnLineNums.setAttribute('aria-pressed', state.lineNumbers ? 'true' : 'false');
   }
   function initialMode() {
     if (window.matchMedia('(max-width: 720px)').matches) return 'preview';
@@ -390,12 +465,10 @@
   let cm, sync;
   function initEditor() {
     cm = window.MdvEditor.create(els.editorArea);
+    cm.setOption('lineNumbers', state.lineNumbers);
     cm.on('change', function () {
       state.dirty = true;
       scheduleRender();
-    });
-    cm.on('cursorActivity', function () {
-      // Update column/line status (could add later)
     });
   }
   function initSync() {
@@ -406,6 +479,7 @@
     });
     sync.setEnabled(state.syncEnabled);
     sync.setActive(state.mode === 'split-h' || state.mode === 'split-v');
+    sync.setClickNavigate(state.clickNavigate);
   }
 
   /* Set editor content and re-measure gutter widths once the content
@@ -416,6 +490,157 @@
     requestAnimationFrame(function () {
       requestAnimationFrame(function () { if (cm) cm.refresh(); });
     });
+  }
+
+  /* ---------- attachments UI ---------- */
+  function addAttachmentsFromFiles(files, overrideName) {
+    let added = 0;
+    const last = files[files.length - 1];
+    for (let i = 0; i < files.length; i++) {
+      const name = overrideName && i === files.length - 1 ? overrideName : null;
+      const item = window.MdvAttachments.add(files[i], name);
+      added++;
+      // Insert a markdown reference at the cursor for the last image
+      if (files[i] === last && cm) {
+        const ref = window.MdvAttachments.referenceFor(item.name);
+        cm.replaceSelection(ref + '\n');
+        cm.focus();
+        selectedAttachment = item.name;
+      }
+    }
+    if (added > 0) {
+      toast('Attached ' + added + ' image' + (added === 1 ? '' : 's'));
+      scheduleRender();
+    }
+  }
+
+  function renderAttachmentList() {
+    if (!window.MdvAttachments) return;
+    const list = window.MdvAttachments.list();
+    els.attachList.innerHTML = '';
+    if (!list.length) {
+      els.attachEmpty.hidden = false;
+      els.attachInsert.disabled = true;
+      els.attachCount.hidden = true;
+      els.attachCount.textContent = '0';
+      selectedAttachment = null;
+      return;
+    }
+    els.attachEmpty.hidden = true;
+    els.attachCount.hidden = false;
+    els.attachCount.textContent = String(list.length);
+
+    list.forEach(function (item) {
+      const li = document.createElement('li');
+      li.className = 'attach-item';
+      if (item.name === selectedAttachment) li.classList.add('is-selected');
+      li.addEventListener('click', function (e) {
+        if (e.target.closest('.attach-remove')) return;
+        selectedAttachment = item.name;
+        els.attachInsert.disabled = false;
+        renderAttachmentList();
+      });
+
+      const img = document.createElement('img');
+      img.src = item.url;
+      img.alt = '';
+      li.appendChild(img);
+
+      const meta = document.createElement('div');
+      meta.className = 'attach-meta';
+      const name = document.createElement('span');
+      name.className = 'attach-name';
+      name.textContent = item.name;
+      name.title = item.name;
+      const size = document.createElement('span');
+      size.className = 'attach-size';
+      size.textContent = formatBytes(item.size);
+      meta.appendChild(name);
+      meta.appendChild(size);
+      li.appendChild(meta);
+
+      const rm = document.createElement('button');
+      rm.className = 'btn btn--icon attach-remove';
+      rm.setAttribute('aria-label', 'Remove ' + item.name);
+      rm.title = 'Remove';
+      rm.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>';
+      rm.addEventListener('click', function (e) {
+        e.stopPropagation();
+        window.MdvAttachments.remove(item.name);
+        if (selectedAttachment === item.name) selectedAttachment = null;
+        toast('Removed ' + item.name);
+      });
+      li.appendChild(rm);
+
+      els.attachList.appendChild(li);
+    });
+    els.attachInsert.disabled = !selectedAttachment;
+  }
+
+  function formatBytes(n) {
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+    return (n / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  function positionAttachPopover() {
+    if (!els.btnAttach || !els.attachPopover) return;
+    const r = els.btnAttach.getBoundingClientRect();
+    const pop = els.attachPopover;
+    pop.style.top  = (r.bottom + 6) + 'px';
+    const desiredLeft = Math.min(r.left, window.innerWidth - pop.offsetWidth - 8);
+    pop.style.left = Math.max(8, desiredLeft) + 'px';
+  }
+
+  function toggleAttachments(force) {
+    const show = (force !== undefined) ? !!force : els.attachPopover.hidden;
+    els.attachPopover.hidden = !show;
+    els.btnAttach.setAttribute('aria-expanded', show ? 'true' : 'false');
+    if (show) {
+      renderAttachmentList();
+      positionAttachPopover();
+    }
+  }
+
+  function installAttachmentsUI() {
+    if (!window.MdvAttachments) return;
+    window.MdvAttachments.onChange(function () {
+      renderAttachmentList();
+      // Re-render to refresh image src URLs
+      scheduleRender();
+    });
+    els.btnAttach.addEventListener('click', function () { toggleAttachments(); });
+    els.attachClose.addEventListener('click', function () { toggleAttachments(false); });
+    els.attachAdd.addEventListener('click', function () {
+      els.attachInput.value = '';
+      els.attachInput.click();
+    });
+    els.attachInput.addEventListener('change', function () {
+      const files = els.attachInput.files;
+      if (files && files.length) {
+        addAttachmentsFromFiles(Array.from(files));
+        renderAttachmentList();
+      }
+    });
+    els.attachInsert.addEventListener('click', function () {
+      if (!selectedAttachment) return;
+      const ref = window.MdvAttachments.referenceFor(selectedAttachment);
+      cm.replaceSelection(ref);
+      cm.focus();
+      toggleAttachments(false);
+      toast('Inserted reference');
+    });
+    // Close on outside click or Escape
+    document.addEventListener('click', function (e) {
+      if (els.attachPopover.hidden) return;
+      if (els.attachPopover.contains(e.target)) return;
+      if (els.btnAttach.contains(e.target)) return;
+      toggleAttachments(false);
+    });
+    window.addEventListener('resize', function () {
+      if (!els.attachPopover.hidden) positionAttachPopover();
+    });
+    renderAttachmentList();
   }
 
   /* Welcome doc */
@@ -472,7 +697,9 @@
   els.btnSave.addEventListener('click', saveFile);
   els.btnExportHtml.addEventListener('click', exportHtml);
   els.btnPrint.addEventListener('click', printPreview);
+  els.btnLineNums.addEventListener('click', toggleLineNumbers);
   els.btnSync.addEventListener('click', toggleSync);
+  els.btnClickNav.addEventListener('click', toggleClickNavigate);
   els.btnTheme.addEventListener('click', toggleTheme);
   els.btnHelp.addEventListener('click', toggleHelp);
 
@@ -512,6 +739,7 @@
     installDragDrop();
     installPaste();
     installMobileTabs();
+    installAttachmentsUI();
     window.MdvShortcuts.install({
       openFile: pickFile,
       saveFile: saveFile,
@@ -521,8 +749,14 @@
       resetSplit: resetSplit,
       toggleTheme: toggleTheme,
       toggleSync: toggleSync,
+      toggleLineNumbers: toggleLineNumbers,
+      toggleClickNavigate: toggleClickNavigate,
       toggleHelp: toggleHelp,
       escape: function () {
+        if (els.attachPopover && !els.attachPopover.hidden) {
+          toggleAttachments(false);
+          return;
+        }
         if (els.helpDialog.open) els.helpDialog.close();
       }
     });
