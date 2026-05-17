@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, claude/markdown-viewer-preview-BMGUe]
   workflow_dispatch:
 
 permissions:
@@ -24,6 +24,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Setup Pages
         uses: actions/configure-pages@v5
+        with:
+          # Auto-enable Pages on first run if it isn't enabled yet.
+          enablement: true
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
