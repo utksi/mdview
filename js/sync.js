@@ -1,6 +1,6 @@
 /* ============================================================
    sync.js — synchronized scroll, selection mirroring,
-             scroll-to-top, click-to-navigate
+             scroll-to-top floating buttons
    ============================================================ */
 (function () {
   'use strict';
@@ -10,11 +10,10 @@
     const previewScroll = opts.previewScroll;
     const previewRoot   = opts.previewRoot;
 
-    let sourceMap = []; // [{line, top, el, height}], sorted by line
-    let lock = null;    // 'editor' | 'preview' | null  (prevents feedback)
+    let sourceMap = [];
+    let lock = null;
     let scrollEnabled = true;
-    let active = true;          // off when in editor- or preview-only mode
-    let clickNavigate = false;
+    let active = true;
     let lastProgrammaticSel = 0;
 
     /* ---------- source-line map ---------- */
@@ -28,6 +27,7 @@
       });
       sourceMap.sort(function (a, b) { return a.line - b.line; });
       cacheOffsets();
+      updateTopButtons();
     }
 
     function cacheOffsets() {
@@ -80,7 +80,6 @@
       lock = 'editor';
       previewScroll.scrollTop = target;
       requestAnimationFrame(function () { lock = null; });
-      updateTopButtons();
     }
 
     function syncFromPreview() {
@@ -108,18 +107,16 @@
       lock = 'preview';
       cm.scrollTo(null, targetTop);
       requestAnimationFrame(function () { lock = null; });
-      updateTopButtons();
     }
 
     /* ---------- selection mirroring ---------- */
     function mirrorEditorToPreview() {
       if (!active) { clearPreviewHighlights(); return; }
 
-      /* If the user has an active selection inside the preview, the browser's
-         native selection already highlights the relevant area; don't double
-         up with our line-range class (and don't leave it lingering when the
-         user double-clicks a word). Always clear stale highlights from a
-         previous editor selection. */
+      /* If the user has an active selection inside the preview, don't add
+         our line-range highlight — the browser's native selection already
+         marks the relevant area, and our highlight would persist after the
+         user double-clicks a word. */
       const docSel = window.getSelection();
       if (docSel && docSel.rangeCount && !docSel.isCollapsed) {
         const ancestor = docSel.getRangeAt(0).commonAncestorContainer;
@@ -129,9 +126,8 @@
         }
       }
 
-      /* If the cursor activity we're reacting to was triggered by our own
-         programmatic mirror (preview->editor), don't add the line highlight —
-         the user is selecting the preview, not the editor. */
+      /* Skip mirroring back when we just set the editor selection
+         programmatically (preview->editor mirror). */
       const now = (window.performance || Date).now();
       if (now - lastProgrammaticSel < 300) {
         clearPreviewHighlights();
@@ -202,80 +198,16 @@
       return null;
     }
 
-    /* ---------- click-to-navigate (double-click) ---------- */
-    function scrollPreviewToLine(line) {
-      cacheOffsets();
-      if (!sourceMap.length) return;
-      const pair = findPair(line);
-      if (!pair) return;
-      let target;
-      if (pair.prev === pair.next || pair.prev.line >= line) {
-        target = pair.prev.top;
-      } else {
-        const range = pair.next.line - pair.prev.line || 1;
-        const progress = (line - pair.prev.line) / range;
-        target = pair.prev.top + (pair.next.top - pair.prev.top) * progress;
-      }
-      lock = 'editor';
-      previewScroll.scrollTo({ top: Math.max(0, target - 20), behavior: 'smooth' });
-      setTimeout(function () { lock = null; updateTopButtons(); }, 500);
-    }
-
-    function scrollEditorToLine(line) {
-      const top = cm.heightAtLine(line, 'local');
-      lock = 'preview';
-      cm.scrollTo(null, Math.max(0, top - 20));
-      setTimeout(function () { lock = null; updateTopButtons(); }, 500);
-    }
-
-    function onPreviewDblClick(e) {
-      if (!clickNavigate) return;
-      let node = e.target;
-      while (node && node !== previewRoot) {
-        if (node.nodeType === 1 && node.hasAttribute && node.hasAttribute('data-source-line')) {
-          const line = parseInt(node.getAttribute('data-source-line'), 10);
-          if (Number.isFinite(line)) {
-            scrollEditorToLine(line);
-            flashEditorLine(line);
-            return;
-          }
-        }
-        node = node.parentNode;
-      }
-    }
-
-    function onEditorDblClick(e) {
-      if (!clickNavigate) return;
-      const pos = cm.coordsChar({ left: e.clientX, top: e.clientY });
-      if (!pos || pos.line == null) return;
-      scrollPreviewToLine(pos.line);
-      flashPreviewLine(pos.line);
-    }
-
-    function flashEditorLine(line) {
-      cm.addLineClass(line, 'background', 'mdv-line-flash');
-      setTimeout(function () {
-        cm.removeLineClass(line, 'background', 'mdv-line-flash');
-      }, 900);
-    }
-
-    function flashPreviewLine(line) {
-      const pair = findPair(line);
-      if (!pair || !pair.prev || !pair.prev.el) return;
-      const el = pair.prev.el;
-      el.classList.add('mdv-block-flash');
-      setTimeout(function () {
-        el.classList.remove('mdv-block-flash');
-      }, 900);
-    }
-
-    /* ---------- scroll-to-top buttons ---------- */
+    /* ---------- scroll-to-top buttons (per pane) ---------- */
+    const SCROLL_TOP_THRESHOLD = 80;
     let topEditor, topPreview;
+
     function installTopButtons() {
       const editorPane  = document.querySelector('.pane--editor');
       const previewPane = document.querySelector('.pane--preview');
       if (editorPane && !editorPane.querySelector('.scroll-top')) {
         topEditor = document.createElement('button');
+        topEditor.type = 'button';
         topEditor.className = 'scroll-top';
         topEditor.setAttribute('aria-label', 'Scroll editor to top');
         topEditor.title = 'Scroll editor to top';
@@ -289,6 +221,7 @@
       }
       if (previewPane && !previewPane.querySelector('.scroll-top')) {
         topPreview = document.createElement('button');
+        topPreview.type = 'button';
         topPreview.className = 'scroll-top';
         topPreview.setAttribute('aria-label', 'Scroll preview to top');
         topPreview.title = 'Scroll preview to top';
@@ -303,14 +236,21 @@
     }
 
     function updateTopButtons() {
-      const editorAt = cm.getScrollInfo().top > 200;
-      const previewAt = previewScroll.scrollTop > 200;
-      if (topEditor)  topEditor.classList.toggle('is-show',  editorAt);
-      if (topPreview) topPreview.classList.toggle('is-show', previewAt);
+      try {
+        const info = cm.getScrollInfo ? cm.getScrollInfo() : { top: 0 };
+        const editorAt = (info && info.top || 0) > SCROLL_TOP_THRESHOLD;
+        const previewAt = previewScroll.scrollTop > SCROLL_TOP_THRESHOLD;
+        if (topEditor)  topEditor.classList.toggle('is-show',  editorAt);
+        if (topPreview) topPreview.classList.toggle('is-show', previewAt);
+      } catch (_) { /* ignore */ }
     }
 
     /* ---------- wiring ---------- */
-    cm.on('scroll', throttleRaf(syncFromEditor));
+    /* Always call updateTopButtons on scroll regardless of sync state. */
+    cm.on('scroll', throttleRaf(function () {
+      syncFromEditor();
+      updateTopButtons();
+    }));
     cm.on('cursorActivity', debounce(mirrorEditorToPreview, 80));
 
     previewScroll.addEventListener('scroll', throttleRaf(function () {
@@ -327,17 +267,19 @@
       mirrorPreviewToEditor();
     }, 80));
 
-    previewRoot.addEventListener('dblclick', onPreviewDblClick);
-    cm.getWrapperElement().addEventListener('dblclick', onEditorDblClick);
-
-    // Recache offsets when the preview reflows (image load, font load, etc.).
     let resizeQueued = false;
-    const ro = new ResizeObserver(function () {
-      if (resizeQueued) return;
-      resizeQueued = true;
-      requestAnimationFrame(function () { resizeQueued = false; cacheOffsets(); });
-    });
-    ro.observe(previewRoot);
+    if (typeof ResizeObserver === 'function') {
+      const ro = new ResizeObserver(function () {
+        if (resizeQueued) return;
+        resizeQueued = true;
+        requestAnimationFrame(function () {
+          resizeQueued = false;
+          cacheOffsets();
+          updateTopButtons();
+        });
+      });
+      ro.observe(previewRoot);
+    }
 
     installTopButtons();
     setTimeout(updateTopButtons, 100);
@@ -369,10 +311,9 @@
       setActive:  function (v) {
         active = !!v;
         if (!active) clearPreviewHighlights();
+        updateTopButtons();
       },
-      setClickNavigate: function (v) { clickNavigate = !!v; },
-      isEnabled: function () { return scrollEnabled; },
-      isClickNavigate: function () { return clickNavigate; }
+      isEnabled: function () { return scrollEnabled; }
     };
   }
 

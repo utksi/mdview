@@ -66,11 +66,6 @@
           handlers.toggleLineNumbers && handlers.toggleLineNumbers();
           return;
         }
-        if (e.key.toLowerCase() === 'j') {
-          e.preventDefault();
-          handlers.toggleClickNavigate && handlers.toggleClickNavigate();
-          return;
-        }
       }
 
       // ? when not in editable field — show help
