@@ -271,8 +271,7 @@
     }
     window.MdvFiles.readTextFile(file).then(function (text) {
       setFilename(file.name);
-      cm.setValue(text);
-      cm.scrollTo(0, 0);
+      setEditorContent(text);
       els.previewScroll.scrollTop = 0;
       toast('Opened ' + file.name);
     }, function (err) {
@@ -342,7 +341,7 @@
         e.preventDefault();
         if (cm.getValue().trim() && !confirm('Replace current content with pasted markdown?')) return;
         setFilename('pasted.md');
-        cm.setValue(text);
+        setEditorContent(text);
         toast('Pasted markdown');
       }
     });
@@ -409,18 +408,28 @@
     sync.setActive(state.mode === 'split-h' || state.mode === 'split-v');
   }
 
+  /* Set editor content and re-measure gutter widths once the content
+     has been laid out. Used wherever cm.setValue is called. */
+  function setEditorContent(text) {
+    cm.setValue(text);
+    cm.scrollTo(0, 0);
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { if (cm) cm.refresh(); });
+    });
+  }
+
   /* Welcome doc */
   const WELCOME_URL = 'examples/welcome.md';
   function loadWelcome() {
     const draft = window.MdvStorage.get('draft', null);
     if (draft && draft.text) {
       setFilename(draft.filename || 'untitled.md');
-      cm.setValue(draft.text);
+      setEditorContent(draft.text);
       toast('Restored last session');
       return;
     }
     function useFallback() {
-      cm.setValue(FALLBACK_WELCOME);
+      setEditorContent(FALLBACK_WELCOME);
       setFilename('welcome.md');
     }
     if (typeof window.fetch !== 'function') { useFallback(); return; }
@@ -430,7 +439,7 @@
         return r.text();
       }).then(function (txt) {
         setFilename('welcome.md');
-        cm.setValue(txt);
+        setEditorContent(txt);
       }).catch(useFallback);
     } catch (_) {
       useFallback();
@@ -518,6 +527,27 @@
       }
     });
     loadWelcome();
+    // CodeMirror caches gutter width based on the line count at init time.
+    // The welcome doc loads later (and its source may have 3-digit line
+    // numbers), so the gutter needs to be re-measured after content lands.
+    // Refresh aggressively: next frame, after window.load (fonts settle),
+    // and whenever the editor pane resizes.
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { if (cm) cm.refresh(); });
+    });
+    if (document.readyState !== 'complete') {
+      window.addEventListener('load', function () {
+        if (cm) cm.refresh();
+        if (sync) sync.cacheOffsets();
+      }, { once: true });
+    }
+    if (typeof ResizeObserver === 'function') {
+      const ro = new ResizeObserver(function () {
+        if (cm) cm.refresh();
+      });
+      const editorPane = document.querySelector('.pane--editor');
+      if (editorPane) ro.observe(editorPane);
+    }
   }
 
   if (document.readyState === 'loading') {

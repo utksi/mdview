@@ -56,7 +56,7 @@
   --color-success:      #3fb950;
   --color-shadow:       0 8px 28px rgba(0, 0, 0, 0.55), 0 2px 5px rgba(0, 0, 0, 0.4);
   --color-highlight-bg: rgba(255, 222, 121, 0.18);
-  --color-selection:    rgba(68, 147, 248, 0.28);
+  --color-selection:    rgba(88, 166, 255, 0.45);
 }
 
 /* ---- base ---- */
@@ -333,8 +333,21 @@ a:hover { text-decoration: underline; }
 }
 .CodeMirror-linenumber { color: var(--color-fg-subtle); padding: 0 8px 0 6px; }
 .CodeMirror-cursor { border-left-color: var(--color-accent); }
-.CodeMirror-selected { background: var(--color-selection) !important; }
-.CodeMirror-focused .CodeMirror-selected { background: var(--color-selection) !important; }
+/* Selection — overrides CodeMirror defaults for both focused and unfocused
+   states. The unfocused state matters because preview→editor mirroring
+   sets the selection without focusing the editor. */
+.CodeMirror .CodeMirror-selected,
+.CodeMirror-focused .CodeMirror-selected,
+.CodeMirror .CodeMirror-line > span::selection,
+.CodeMirror .CodeMirror-line > span > span::selection,
+.CodeMirror-line::selection {
+  background: var(--color-selection) !important;
+  color: inherit !important;
+}
+.theme-dark .CodeMirror .CodeMirror-selected,
+.theme-dark .CodeMirror-focused .CodeMirror-selected {
+  background: rgba(88, 166, 255, 0.55) !important;
+}
 .CodeMirror-activeline-background { background: var(--color-bg-alt); }
 .CodeMirror-line { padding: 0 8px; }
 
