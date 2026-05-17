@@ -210,7 +210,7 @@
     state.filename = name || 'untitled.md';
     els.filename.textContent = state.filename;
     els.filename.setAttribute('title', state.filename);
-    document.title = state.filename + ' — mdview';
+    document.title = state.filename + ' · mdview';
   }
 
   /* Render pipeline */
@@ -304,7 +304,7 @@
       }, 250);
       toast('Saved ' + name + ' + ' + attachCount +
         ' attachment' + (attachCount === 1 ? '' : 's') +
-        ' — keep them in the same folder');
+        '; keep them in the same folder');
     } else {
       toast('Saved ' + name);
     }
