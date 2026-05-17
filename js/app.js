@@ -36,6 +36,7 @@
     btnPrint: $('#btn-print'),
     btnLineNums: $('#btn-linenums'),
     btnSync: $('#btn-sync'),
+    btnGuide: $('#btn-guide'),
     btnTheme: $('#btn-theme'),
     btnHelp: $('#btn-help'),
     helpDialog: $('#help-dialog'),
@@ -490,13 +491,50 @@
   }
 
   /* Set editor content and re-measure gutter widths once the content
-     has been laid out. Used wherever cm.setValue is called. */
+     has been laid out. Used wherever cm.setValue is called. Also resets
+     the dirty flag so the guide / open buttons know whether the user
+     has unsaved changes relative to the most recently loaded file. */
   function setEditorContent(text) {
     cm.setValue(text);
+    // cm.setValue triggers the 'change' handler which would have just set
+    // state.dirty = true; clear it again so a freshly-loaded file is clean.
+    state.dirty = false;
     cm.scrollTo(0, 0);
     requestAnimationFrame(function () {
       requestAnimationFrame(function () { if (cm) cm.refresh(); });
     });
+  }
+
+  /* Load (or reload) the bundled welcome guide. If the user has unsaved
+     changes, confirm before replacing — they can cancel and download the
+     current document first. */
+  function loadGuide() {
+    if (state.dirty && cm.getValue().trim()) {
+      const ok = window.confirm(
+        'Replace the current document with the welcome guide?\n\n' +
+        'Unsaved changes will be lost. To keep them, cancel and download ' +
+        'the document first.'
+      );
+      if (!ok) return;
+    }
+    function useFallback() {
+      setFilename('welcome.md');
+      setEditorContent(FALLBACK_WELCOME);
+      toast('Loaded welcome guide (fallback)');
+    }
+    if (typeof window.fetch !== 'function') { useFallback(); return; }
+    try {
+      window.fetch(WELCOME_URL, { cache: 'no-store' }).then(function (r) {
+        if (!r.ok) throw new Error('No welcome doc');
+        return r.text();
+      }).then(function (txt) {
+        setFilename('welcome.md');
+        setEditorContent(txt);
+        toast('Loaded welcome guide');
+      }).catch(useFallback);
+    } catch (_) {
+      useFallback();
+    }
   }
 
   /* ---------- attachments UI ---------- */
@@ -712,6 +750,7 @@
   bind(els.btnLineNums,    'click', toggleLineNumbers);
   bind(els.btnSync,        'click', toggleSync);
   bind(els.btnTheme,       'click', toggleTheme);
+  bind(els.btnGuide,       'click', loadGuide);
   bind(els.btnHelp,        'click', toggleHelp);
 
   /* React to OS theme changes */
@@ -769,6 +808,7 @@
       toggleSync: toggleSync,
       toggleLineNumbers: toggleLineNumbers,
       toggleHelp: toggleHelp,
+      loadGuide: loadGuide,
       escape: function () {
         if (els.attachPopover && !els.attachPopover.hidden) {
           toggleAttachments(false);
