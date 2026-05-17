@@ -369,19 +369,13 @@ a:hover { text-decoration: underline; }
 }
 .CodeMirror-linenumber { color: var(--color-fg-subtle); padding: 0 12px 0 8px; }
 
-/* Belt-and-braces hide for line numbers — CSS fallback that works
-   independently of CodeMirror's own gutter repaint. We hide the gutter
-   container entirely and zero out the sizer margin so text reflows to
-   the left edge. */
-:root.no-line-numbers .CodeMirror-gutters,
-:root.no-line-numbers .CodeMirror-linenumbers,
-:root.no-line-numbers .CodeMirror-linenumber,
-:root.no-line-numbers .CodeMirror-gutter-wrapper {
-  display: none !important;
-}
-:root.no-line-numbers .CodeMirror-sizer {
-  margin-left: 0 !important;
-}
+/* The .no-line-numbers class on <html> is set by the toggle. It used to
+   force-hide the gutter via display:none and zero out the sizer margin,
+   but that fought with CodeMirror's own gutter bookkeeping and caused
+   the gutter to come back wider than its initial render after toggling
+   off and on again. We now leave the hide to CM (cm.setOption handles
+   it correctly) and keep this class purely as a styling hook should any
+   other rules want to react to the state in the future. */
 .CodeMirror-cursor { border-left-color: var(--color-accent); }
 /* Selection — overrides CodeMirror defaults for both focused and unfocused
    states. The unfocused state matters because preview→editor mirroring

@@ -420,23 +420,29 @@
     toast('Sync scroll ' + (state.syncEnabled ? 'on' : 'off'));
   }
 
-  /* Line-numbers toggle. We update the aria-pressed and CSS class first
-     (cheap, can't fail) and then call CodeMirror's setOption (which is the
-     proper way to resize the gutter). The CSS class is a belt-and-braces
-     fallback in case CM's gutter repaint hasn't flushed yet. */
+  /* Line-numbers toggle.
+
+     We let CodeMirror itself manage the gutter — it has the gutter-width
+     bookkeeping and the sizer-margin update wired up correctly. Our CSS
+     fallback (the :root.no-line-numbers class) used to also hide the
+     gutter and zero the sizer margin, which collided with CM's own state
+     on the re-enable path and caused the gutter to be re-measured at the
+     wrong width. Now the class is only a styling hook; the actual hide
+     happens via cm.setOption. After toggling we refresh twice across two
+     frames so the gutter width is recomputed against the now-correct
+     visibility state. */
   function applyLineNumbers() {
-    // 1. Visual indicator FIRST so it always updates even if CM throws.
     if (els.btnLineNums) {
       els.btnLineNums.setAttribute('aria-pressed', state.lineNumbers ? 'true' : 'false');
     }
     document.documentElement.classList.toggle('no-line-numbers', !state.lineNumbers);
-    // 2. CodeMirror option — proper layout-aware toggle.
     if (cm) {
-      try {
-        cm.setOption('lineNumbers', state.lineNumbers);
-      } catch (_) { /* ignore — CSS class above handles visual hiding */ }
+      try { cm.setOption('lineNumbers', state.lineNumbers); } catch (_) {}
       requestAnimationFrame(function () {
         try { cm.refresh(); } catch (_) {}
+        requestAnimationFrame(function () {
+          try { cm.refresh(); } catch (_) {}
+        });
       });
     }
   }
