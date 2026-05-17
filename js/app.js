@@ -420,17 +420,30 @@
     toast('Sync scroll ' + (state.syncEnabled ? 'on' : 'off'));
   }
 
-  /* Line-numbers toggle. We toggle both via the CM API (for proper gutter
-     resize) and via a CSS class as a belt-and-braces fallback in case the
-     option toggle hasn't repainted yet. */
+  /* Line-numbers toggle.
+
+     We let CodeMirror itself manage the gutter — it has the gutter-width
+     bookkeeping and the sizer-margin update wired up correctly. Our CSS
+     fallback (the :root.no-line-numbers class) used to also hide the
+     gutter and zero the sizer margin, which collided with CM's own state
+     on the re-enable path and caused the gutter to be re-measured at the
+     wrong width. Now the class is only a styling hook; the actual hide
+     happens via cm.setOption. After toggling we refresh twice across two
+     frames so the gutter width is recomputed against the now-correct
+     visibility state. */
   function applyLineNumbers() {
-    document.documentElement.classList.toggle('no-line-numbers', !state.lineNumbers);
-    if (cm) {
-      cm.setOption('lineNumbers', state.lineNumbers);
-      requestAnimationFrame(function () { cm.refresh(); });
-    }
     if (els.btnLineNums) {
       els.btnLineNums.setAttribute('aria-pressed', state.lineNumbers ? 'true' : 'false');
+    }
+    document.documentElement.classList.toggle('no-line-numbers', !state.lineNumbers);
+    if (cm) {
+      try { cm.setOption('lineNumbers', state.lineNumbers); } catch (_) {}
+      requestAnimationFrame(function () {
+        try { cm.refresh(); } catch (_) {}
+        requestAnimationFrame(function () {
+          try { cm.refresh(); } catch (_) {}
+        });
+      });
     }
   }
   function toggleLineNumbers() {
@@ -686,15 +699,20 @@
     b.addEventListener('click', function () { setMode(b.getAttribute('data-mode')); });
   });
 
-  /* Toolbar wiring */
-  els.btnOpen.addEventListener('click', pickFile);
-  els.btnSave.addEventListener('click', saveFile);
-  els.btnExportHtml.addEventListener('click', exportHtml);
-  els.btnPrint.addEventListener('click', printPreview);
-  els.btnLineNums.addEventListener('click', toggleLineNumbers);
-  els.btnSync.addEventListener('click', toggleSync);
-  els.btnTheme.addEventListener('click', toggleTheme);
-  els.btnHelp.addEventListener('click', toggleHelp);
+  /* Toolbar wiring. Each binding is independent so a single missing
+     element doesn't prevent the rest from being wired up. */
+  function bind(el, ev, fn) {
+    if (el) el.addEventListener(ev, fn);
+    else if (window.console && console.warn) console.warn('[mdview] missing element for', ev, fn);
+  }
+  bind(els.btnOpen,        'click', pickFile);
+  bind(els.btnSave,        'click', saveFile);
+  bind(els.btnExportHtml,  'click', exportHtml);
+  bind(els.btnPrint,       'click', printPreview);
+  bind(els.btnLineNums,    'click', toggleLineNumbers);
+  bind(els.btnSync,        'click', toggleSync);
+  bind(els.btnTheme,       'click', toggleTheme);
+  bind(els.btnHelp,        'click', toggleHelp);
 
   /* React to OS theme changes */
   if (window.matchMedia) {
@@ -720,19 +738,26 @@
     }
   });
 
-  /* Boot */
+  /* Boot. Each step is isolated so one failing installer can't take the
+     others (and their button handlers) down with it. */
+  function safeRun(label, fn) {
+    try { fn(); }
+    catch (e) {
+      if (window.console && console.error) console.error('[mdview] ' + label + ' failed:', e);
+    }
+  }
   function boot() {
-    restoreState();
-    applyTheme();
-    initEditor();
-    initSync();
-    setMode(state.mode);
-    applySplitRatio();
-    installSplitter();
-    installDragDrop();
-    installPaste();
-    installMobileTabs();
-    installAttachmentsUI();
+    safeRun('restoreState',     restoreState);
+    safeRun('applyTheme',       applyTheme);
+    safeRun('initEditor',       initEditor);
+    safeRun('initSync',         initSync);
+    safeRun('setMode',          function () { setMode(state.mode); });
+    safeRun('applySplitRatio',  applySplitRatio);
+    safeRun('installSplitter',  installSplitter);
+    safeRun('installDragDrop',  installDragDrop);
+    safeRun('installPaste',     installPaste);
+    safeRun('installMobileTabs',installMobileTabs);
+    safeRun('installAttachmentsUI', installAttachmentsUI);
     window.MdvShortcuts.install({
       openFile: pickFile,
       saveFile: saveFile,
