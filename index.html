@@ -23,7 +23,7 @@
   <link rel="stylesheet" id="hljs-light" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
   <link rel="stylesheet" id="hljs-dark" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" disabled>
 
-  <link rel="stylesheet" href="css/styles.css?v=6">
+  <link rel="stylesheet" href="css/styles.css?v=7">
 </head>
 <body>
   <!-- Application shell -->
@@ -83,6 +83,9 @@
       <button type="button" class="btn btn--icon" id="btn-theme" title="Toggle theme (Alt+T)" aria-label="Toggle theme">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" class="icon-theme-light"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" class="icon-theme-dark"><path fill="currentColor" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+      <button type="button" class="btn btn--icon" id="btn-guide" title="Load welcome guide" aria-label="Load welcome guide">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20V2H6.5A2.5 2.5 0 0 0 4 4.5v15z"/></svg>
       </button>
       <button type="button" class="btn btn--icon" id="btn-help" title="Help (?)" aria-label="Show help">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.7 2.18c-.7.39-1.2 1.04-1.2 1.82V14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg>
@@ -160,7 +163,7 @@
     <form method="dialog">
       <header class="dialog-head">
         <h2 id="help-title">Keyboard shortcuts</h2>
-        <button type="button" class="btn btn--icon" value="close" aria-label="Close"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg></button>
+        <button type="submit" class="btn btn--icon" value="close" aria-label="Close"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg></button>
       </header>
       <div class="dialog-body">
         <table class="kbd-table">
@@ -182,6 +185,7 @@
             <tr><th>Inline code</th><td><kbd>Ctrl</kbd>+<kbd>E</kbd></td></tr>
             <tr><th>Link</th><td><kbd>Ctrl</kbd>+<kbd>K</kbd></td></tr>
             <tr><th>Reset split</th><td><kbd>Alt</kbd>+<kbd>0</kbd></td></tr>
+            <tr><th>Load welcome guide</th><td><kbd>Alt</kbd>+<kbd>G</kbd></td></tr>
             <tr><th>This dialog</th><td><kbd>?</kbd></td></tr>
           </tbody>
         </table>
@@ -229,13 +233,13 @@
 
   <!-- App scripts. The ?v= query string busts any stale browser/CDN cache
        when these files change; bump the number when the app code changes. -->
-  <script src="js/storage.js?v=6"></script>
-  <script src="js/attachments.js?v=6"></script>
-  <script src="js/markdown.js?v=6"></script>
-  <script src="js/editor.js?v=6"></script>
-  <script src="js/sync.js?v=6"></script>
-  <script src="js/files.js?v=6"></script>
-  <script src="js/shortcuts.js?v=6"></script>
-  <script src="js/app.js?v=6"></script>
+  <script src="js/storage.js?v=7"></script>
+  <script src="js/attachments.js?v=7"></script>
+  <script src="js/markdown.js?v=7"></script>
+  <script src="js/editor.js?v=7"></script>
+  <script src="js/sync.js?v=7"></script>
+  <script src="js/files.js?v=7"></script>
+  <script src="js/shortcuts.js?v=7"></script>
+  <script src="js/app.js?v=7"></script>
 </body>
 </html>
