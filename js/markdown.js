@@ -185,7 +185,7 @@
       return CD + id + CD;
     });
 
-    // 4. Block math: $$ on its own line(s).
+    // 4a. Block math with $$ delimiters on their own line(s).
     out = out.replace(/(^|\n)[ \t]*\$\$\n?([\s\S]+?)\n?\$\$[ \t]*(?=\n|$)/g,
       function (m, pre, body, offset) {
         const realOffset = offset + pre.length;
@@ -194,14 +194,30 @@
         return padLines(m, pre + '\n' + BD + id + BD + '\n');
       });
 
-    // 5. Inline math: $...$. Avoid currency by requiring non-space
-    //    neighbors and a non-digit char after the closing $.
+    // 4b. Block math with LaTeX \[ ... \] delimiters on their own line(s).
+    out = out.replace(/(^|\n)[ \t]*\\\[\n?([\s\S]+?)\n?\\\][ \t]*(?=\n|$)/g,
+      function (m, pre, body, offset) {
+        const realOffset = offset + pre.length;
+        const id = slots.length;
+        slots.push({ kind: 'math-block', body: body, line: lineFromOffset(out, realOffset) });
+        return padLines(m, pre + '\n' + BD + id + BD + '\n');
+      });
+
+    // 5a. Inline math with $...$. Avoid currency by requiring non-space
+    //     neighbors and a non-digit char after the closing $.
     out = out.replace(/(^|[^\\$])\$(?!\s)((?:\\.|[^$\\\n])+?)(?<!\s)\$(?!\d)/g,
       function (m, pre, body) {
         const id = slots.length;
         slots.push({ kind: 'math-inline', body: body });
         return pre + ID + id + ID;
       });
+
+    // 5b. Inline math with LaTeX \( ... \) delimiters.
+    out = out.replace(/\\\(([^\n]+?)\\\)/g, function (m, body) {
+      const id = slots.length;
+      slots.push({ kind: 'math-inline', body: body });
+      return ID + id + ID;
+    });
 
     // 6. Restore code from the shelf — markdown-it now sees the original
     //    code blocks and inline spans, unmodified.

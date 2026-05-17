@@ -202,9 +202,19 @@
 
     previewScroll.addEventListener('scroll', throttleRaf(syncFromPreview), { passive: true });
 
-    // Preview selection: fire on mouseup/keyup (within preview)
-    previewRoot.addEventListener('mouseup', debounce(mirrorPreviewToEditor, 50));
-    previewRoot.addEventListener('keyup', debounce(mirrorPreviewToEditor, 50));
+    // Preview selection: use document-level selectionchange so the mirror
+    // fires even when the drag ends outside the preview root (mouseup on
+    // previewRoot misses those releases). We filter to selections whose
+    // common ancestor is inside the preview to avoid reacting to selections
+    // made elsewhere (the editor's own, the toolbar, dialogs, etc.).
+    document.addEventListener('selectionchange', debounce(function () {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+      const range = sel.getRangeAt(0);
+      const anchor = range.commonAncestorContainer;
+      if (!anchor || !previewRoot.contains(anchor)) return;
+      mirrorPreviewToEditor();
+    }, 80));
 
     // When the window resizes or preview reflows, recache offsets.
     let resizeQueued = false;
