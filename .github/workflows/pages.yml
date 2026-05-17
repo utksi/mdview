@@ -1,3 +1,9 @@
+# Pages must be enabled once manually before this workflow can publish:
+#   Settings → Pages → Source: "GitHub Actions"
+# The GITHUB_TOKEN's pages:write permission only allows publishing, not
+# enabling the site (that requires admin or a PAT), so `enablement: true`
+# on configure-pages does not work with the default workflow token.
+
 name: Deploy to GitHub Pages
 
 on:
@@ -21,7 +27,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
