@@ -14,7 +14,6 @@
     theme: 'auto',     // 'auto' | 'light' | 'dark'
     splitRatio: 0.5,
     syncEnabled: true,
-    clickNavigate: false,
     lineNumbers: true,
     dirty: false
   };
@@ -37,7 +36,6 @@
     btnPrint: $('#btn-print'),
     btnLineNums: $('#btn-linenums'),
     btnSync: $('#btn-sync'),
-    btnClickNav: $('#btn-clicknav'),
     btnTheme: $('#btn-theme'),
     btnHelp: $('#btn-help'),
     helpDialog: $('#help-dialog'),
@@ -422,24 +420,22 @@
     toast('Sync scroll ' + (state.syncEnabled ? 'on' : 'off'));
   }
 
-  /* Click-to-navigate toggle (double-click in either pane jumps the
-     other pane to the matching line — useful when sync scroll is off). */
-  function toggleClickNavigate() {
-    state.clickNavigate = !state.clickNavigate;
-    sync.setClickNavigate(state.clickNavigate);
-    els.btnClickNav.setAttribute('aria-pressed', state.clickNavigate ? 'true' : 'false');
-    window.MdvStorage.set('clickNavigate', state.clickNavigate);
-    toast('Double-click to jump ' + (state.clickNavigate ? 'on' : 'off'));
-  }
-
-  /* Line-numbers toggle */
-  function toggleLineNumbers() {
-    state.lineNumbers = !state.lineNumbers;
+  /* Line-numbers toggle. We toggle both via the CM API (for proper gutter
+     resize) and via a CSS class as a belt-and-braces fallback in case the
+     option toggle hasn't repainted yet. */
+  function applyLineNumbers() {
+    document.documentElement.classList.toggle('no-line-numbers', !state.lineNumbers);
     if (cm) {
       cm.setOption('lineNumbers', state.lineNumbers);
       requestAnimationFrame(function () { cm.refresh(); });
     }
-    els.btnLineNums.setAttribute('aria-pressed', state.lineNumbers ? 'true' : 'false');
+    if (els.btnLineNums) {
+      els.btnLineNums.setAttribute('aria-pressed', state.lineNumbers ? 'true' : 'false');
+    }
+  }
+  function toggleLineNumbers() {
+    state.lineNumbers = !state.lineNumbers;
+    applyLineNumbers();
     window.MdvStorage.set('lineNumbers', state.lineNumbers);
     toast('Line numbers ' + (state.lineNumbers ? 'on' : 'off'));
   }
@@ -450,11 +446,10 @@
     state.mode = window.MdvStorage.get('mode', initialMode());
     state.splitRatio = +window.MdvStorage.get('splitRatio', 0.5) || 0.5;
     state.syncEnabled = window.MdvStorage.get('syncEnabled', true);
-    state.clickNavigate = window.MdvStorage.get('clickNavigate', false);
-    state.lineNumbers   = window.MdvStorage.get('lineNumbers', true);
-    els.btnSync.setAttribute('aria-pressed', state.syncEnabled ? 'true' : 'false');
-    els.btnClickNav.setAttribute('aria-pressed', state.clickNavigate ? 'true' : 'false');
-    els.btnLineNums.setAttribute('aria-pressed', state.lineNumbers ? 'true' : 'false');
+    state.lineNumbers = window.MdvStorage.get('lineNumbers', true);
+    if (els.btnSync) els.btnSync.setAttribute('aria-pressed', state.syncEnabled ? 'true' : 'false');
+    if (els.btnLineNums) els.btnLineNums.setAttribute('aria-pressed', state.lineNumbers ? 'true' : 'false');
+    document.documentElement.classList.toggle('no-line-numbers', !state.lineNumbers);
   }
   function initialMode() {
     if (window.matchMedia('(max-width: 720px)').matches) return 'preview';
@@ -479,7 +474,6 @@
     });
     sync.setEnabled(state.syncEnabled);
     sync.setActive(state.mode === 'split-h' || state.mode === 'split-v');
-    sync.setClickNavigate(state.clickNavigate);
   }
 
   /* Set editor content and re-measure gutter widths once the content
@@ -699,7 +693,6 @@
   els.btnPrint.addEventListener('click', printPreview);
   els.btnLineNums.addEventListener('click', toggleLineNumbers);
   els.btnSync.addEventListener('click', toggleSync);
-  els.btnClickNav.addEventListener('click', toggleClickNavigate);
   els.btnTheme.addEventListener('click', toggleTheme);
   els.btnHelp.addEventListener('click', toggleHelp);
 
@@ -750,7 +743,6 @@
       toggleTheme: toggleTheme,
       toggleSync: toggleSync,
       toggleLineNumbers: toggleLineNumbers,
-      toggleClickNavigate: toggleClickNavigate,
       toggleHelp: toggleHelp,
       escape: function () {
         if (els.attachPopover && !els.attachPopover.hidden) {

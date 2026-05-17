@@ -80,9 +80,6 @@
       <button class="btn btn--icon btn--toggle" id="btn-sync" title="Toggle synchronized scrolling (Alt+S)" aria-label="Toggle sync scroll" aria-pressed="true">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M4 7h12l-3-3m3 3l-3 3M20 17H8l3 3m-3-3l3-3"/></svg>
       </button>
-      <button class="btn btn--icon btn--toggle" id="btn-clicknav" title="Double-click to jump to that line in the other pane" aria-label="Toggle click-to-navigate" aria-pressed="false">
-        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" d="M5 3l5 14 2-6 6-2z"/><path d="M14 14l4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-      </button>
       <button class="btn btn--icon" id="btn-theme" title="Toggle theme (Alt+T)" aria-label="Toggle theme">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" class="icon-theme-light"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" class="icon-theme-dark"><path fill="currentColor" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
@@ -91,35 +88,36 @@
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.7 2.18c-.7.39-1.2 1.04-1.2 1.82V14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg>
       </button>
     </div>
-
-    <!-- Attachments popover (positioned by JS under #btn-attach) -->
-    <div class="popover" id="attach-popover" role="dialog" aria-label="Image attachments" hidden>
-      <div class="popover-head">
-        <strong>Attachments</strong>
-        <button class="btn btn--icon popover-close" id="attach-close" aria-label="Close">
-          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>
-        </button>
-      </div>
-      <div class="popover-body">
-        <ul class="attach-list" id="attach-list"></ul>
-        <p class="attach-empty" id="attach-empty">
-          No images attached yet. Drop image files on the page,
-          paste an image from clipboard, or click <em>Add image</em>.
-        </p>
-        <div class="attach-actions">
-          <button class="btn btn--primary" id="attach-add">Add image</button>
-          <button class="btn" id="attach-insert" disabled title="Insert markdown reference for the selected image at the cursor">Insert reference</button>
-        </div>
-        <p class="attach-note">
-          Attachments live in memory for this session. When you download
-          markdown, attachments download alongside it — keep all files in
-          the same folder for the <code>./name.ext</code> references to resolve.
-        </p>
-      </div>
-    </div>
-
-    <input type="file" id="attach-input" accept="image/*" multiple hidden>
   </header>
+
+  <!-- Attachments popover (positioned by JS under #btn-attach, lives outside
+       the header to avoid any containing-block surprises) -->
+  <div class="popover" id="attach-popover" role="dialog" aria-label="Image attachments" hidden>
+    <div class="popover-head">
+      <strong>Attachments</strong>
+      <button type="button" class="btn btn--icon popover-close" id="attach-close" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="popover-body">
+      <ul class="attach-list" id="attach-list"></ul>
+      <p class="attach-empty" id="attach-empty">
+        No images attached yet. Drop image files on the page,
+        paste an image from clipboard, or click <em>Add image</em>.
+      </p>
+      <div class="attach-actions">
+        <button type="button" class="btn btn--primary" id="attach-add">Add image</button>
+        <button type="button" class="btn" id="attach-insert" disabled title="Insert markdown reference for the selected image at the cursor">Insert reference</button>
+      </div>
+      <p class="attach-note">
+        Attachments live in memory for this session. When you download
+        markdown, attachments download alongside it — keep all files in
+        the same folder for the <code>./name.ext</code> references to resolve.
+      </p>
+    </div>
+  </div>
+
+  <input type="file" id="attach-input" accept="image/*" multiple hidden>
 
   <main class="workspace" id="workspace" data-mode="split-h" role="main">
     <section class="pane pane--editor" aria-label="Markdown source editor">
@@ -179,7 +177,6 @@
             <tr><th>Toggle theme</th><td><kbd>Alt</kbd>+<kbd>T</kbd></td></tr>
             <tr><th>Toggle sync scroll</th><td><kbd>Alt</kbd>+<kbd>S</kbd></td></tr>
             <tr><th>Toggle line numbers</th><td><kbd>Alt</kbd>+<kbd>L</kbd></td></tr>
-            <tr><th>Toggle double-click jump</th><td><kbd>Alt</kbd>+<kbd>J</kbd></td></tr>
             <tr><th>Bold</th><td><kbd>Ctrl</kbd>+<kbd>B</kbd></td></tr>
             <tr><th>Italic</th><td><kbd>Ctrl</kbd>+<kbd>I</kbd></td></tr>
             <tr><th>Inline code</th><td><kbd>Ctrl</kbd>+<kbd>E</kbd></td></tr>
