@@ -420,17 +420,24 @@
     toast('Sync scroll ' + (state.syncEnabled ? 'on' : 'off'));
   }
 
-  /* Line-numbers toggle. We toggle both via the CM API (for proper gutter
-     resize) and via a CSS class as a belt-and-braces fallback in case the
-     option toggle hasn't repainted yet. */
+  /* Line-numbers toggle. We update the aria-pressed and CSS class first
+     (cheap, can't fail) and then call CodeMirror's setOption (which is the
+     proper way to resize the gutter). The CSS class is a belt-and-braces
+     fallback in case CM's gutter repaint hasn't flushed yet. */
   function applyLineNumbers() {
-    document.documentElement.classList.toggle('no-line-numbers', !state.lineNumbers);
-    if (cm) {
-      cm.setOption('lineNumbers', state.lineNumbers);
-      requestAnimationFrame(function () { cm.refresh(); });
-    }
+    // 1. Visual indicator FIRST so it always updates even if CM throws.
     if (els.btnLineNums) {
       els.btnLineNums.setAttribute('aria-pressed', state.lineNumbers ? 'true' : 'false');
+    }
+    document.documentElement.classList.toggle('no-line-numbers', !state.lineNumbers);
+    // 2. CodeMirror option — proper layout-aware toggle.
+    if (cm) {
+      try {
+        cm.setOption('lineNumbers', state.lineNumbers);
+      } catch (_) { /* ignore — CSS class above handles visual hiding */ }
+      requestAnimationFrame(function () {
+        try { cm.refresh(); } catch (_) {}
+      });
     }
   }
   function toggleLineNumbers() {
@@ -686,15 +693,20 @@
     b.addEventListener('click', function () { setMode(b.getAttribute('data-mode')); });
   });
 
-  /* Toolbar wiring */
-  els.btnOpen.addEventListener('click', pickFile);
-  els.btnSave.addEventListener('click', saveFile);
-  els.btnExportHtml.addEventListener('click', exportHtml);
-  els.btnPrint.addEventListener('click', printPreview);
-  els.btnLineNums.addEventListener('click', toggleLineNumbers);
-  els.btnSync.addEventListener('click', toggleSync);
-  els.btnTheme.addEventListener('click', toggleTheme);
-  els.btnHelp.addEventListener('click', toggleHelp);
+  /* Toolbar wiring. Each binding is independent so a single missing
+     element doesn't prevent the rest from being wired up. */
+  function bind(el, ev, fn) {
+    if (el) el.addEventListener(ev, fn);
+    else if (window.console && console.warn) console.warn('[mdview] missing element for', ev, fn);
+  }
+  bind(els.btnOpen,        'click', pickFile);
+  bind(els.btnSave,        'click', saveFile);
+  bind(els.btnExportHtml,  'click', exportHtml);
+  bind(els.btnPrint,       'click', printPreview);
+  bind(els.btnLineNums,    'click', toggleLineNumbers);
+  bind(els.btnSync,        'click', toggleSync);
+  bind(els.btnTheme,       'click', toggleTheme);
+  bind(els.btnHelp,        'click', toggleHelp);
 
   /* React to OS theme changes */
   if (window.matchMedia) {
@@ -720,19 +732,26 @@
     }
   });
 
-  /* Boot */
+  /* Boot. Each step is isolated so one failing installer can't take the
+     others (and their button handlers) down with it. */
+  function safeRun(label, fn) {
+    try { fn(); }
+    catch (e) {
+      if (window.console && console.error) console.error('[mdview] ' + label + ' failed:', e);
+    }
+  }
   function boot() {
-    restoreState();
-    applyTheme();
-    initEditor();
-    initSync();
-    setMode(state.mode);
-    applySplitRatio();
-    installSplitter();
-    installDragDrop();
-    installPaste();
-    installMobileTabs();
-    installAttachmentsUI();
+    safeRun('restoreState',     restoreState);
+    safeRun('applyTheme',       applyTheme);
+    safeRun('initEditor',       initEditor);
+    safeRun('initSync',         initSync);
+    safeRun('setMode',          function () { setMode(state.mode); });
+    safeRun('applySplitRatio',  applySplitRatio);
+    safeRun('installSplitter',  installSplitter);
+    safeRun('installDragDrop',  installDragDrop);
+    safeRun('installPaste',     installPaste);
+    safeRun('installMobileTabs',installMobileTabs);
+    safeRun('installAttachmentsUI', installAttachmentsUI);
     window.MdvShortcuts.install({
       openFile: pickFile,
       saveFile: saveFile,

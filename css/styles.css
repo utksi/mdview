@@ -369,16 +369,18 @@ a:hover { text-decoration: underline; }
 }
 .CodeMirror-linenumber { color: var(--color-fg-subtle); padding: 0 12px 0 8px; }
 
-/* Belt-and-braces hide for line numbers — CSS fallback in case CM's own
-   gutter toggle hasn't repainted yet after setOption('lineNumbers', …). */
+/* Belt-and-braces hide for line numbers — CSS fallback that works
+   independently of CodeMirror's own gutter repaint. We hide the gutter
+   container entirely and zero out the sizer margin so text reflows to
+   the left edge. */
+:root.no-line-numbers .CodeMirror-gutters,
 :root.no-line-numbers .CodeMirror-linenumbers,
-:root.no-line-numbers .CodeMirror-linenumber {
+:root.no-line-numbers .CodeMirror-linenumber,
+:root.no-line-numbers .CodeMirror-gutter-wrapper {
   display: none !important;
 }
-:root.no-line-numbers .CodeMirror-gutters {
-  width: 0 !important;
-  border-right: 0 !important;
-  padding: 0 !important;
+:root.no-line-numbers .CodeMirror-sizer {
+  margin-left: 0 !important;
 }
 .CodeMirror-cursor { border-left-color: var(--color-accent); }
 /* Selection — overrides CodeMirror defaults for both focused and unfocused
