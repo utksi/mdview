@@ -110,10 +110,20 @@
     // Ratio CSS variable
     applySplitRatio();
     window.MdvStorage.set('mode', mode);
-    // Refresh CodeMirror after layout change
+    /* Refresh CodeMirror after a layout change. When the editor pane was
+       just toggled from display:none back to visible (split or editor
+       mode after preview-only), CM's cached gutter dimensions are stale.
+       A single refresh in the next frame can fire before the browser has
+       flushed the new layout, leaving the gutter wider than its initial
+       render. Double-refresh across two frames lets the gutter remeasure
+       against the final laid-out state. */
     requestAnimationFrame(function () {
       if (cm) cm.refresh();
       if (sync) sync.cacheOffsets();
+      requestAnimationFrame(function () {
+        if (cm) cm.refresh();
+        if (sync) sync.cacheOffsets();
+      });
     });
   }
 
